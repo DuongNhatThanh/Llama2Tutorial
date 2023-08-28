@@ -1,0 +1,10 @@
+os
+streamlit
+pickle
+dotenv 
+PyPDF2
+streamlit_extras.add_vertical_space 
+langchain.text_splitter 
+langchain.embeddings 
+langchain.vectorstores
+langchain.chains.question_answering 
