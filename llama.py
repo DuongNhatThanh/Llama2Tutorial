@@ -4,11 +4,6 @@
 # the text we want as an input. Change these strings to run your own example.
 ######################################################################################################
 
-from clarifai_grpc.channel.clarifai_channel import ClarifaiChannel
-from clarifai_grpc.grpc.api import resources_pb2, service_pb2, service_pb2_grpc
-from clarifai_grpc.grpc.api.status import status_code_pb2
-import streamlit as st
-
 # Your PAT (Personal Access Token) can be found in the portal under Authentification
 PAT = st.secrets.PAT
 # Specify the correct user_id/app_id pairings
@@ -17,56 +12,53 @@ USER_ID = st.secrets.USER_ID
 APP_ID = st.secrets.APP_ID
 # Change these to whatever model and text URL you want to use
 WORKFLOW_ID = 'Llama2TutorialWorkflow'
+TEXT_FILE_URL = 'https://samples.clarifai.com/negative_sentence_12.txt'
 
 ############################################################################
 # YOU DO NOT NEED TO CHANGE ANYTHING BELOW THIS LINE TO RUN THIS EXAMPLE
 ############################################################################
 
-def get_response(prompt):
-    channel = ClarifaiChannel.get_grpc_channel()
-    stub = service_pb2_grpc.V2Stub(channel)
+from clarifai_grpc.channel.clarifai_channel import ClarifaiChannel
+from clarifai_grpc.grpc.api import resources_pb2, service_pb2, service_pb2_grpc
+from clarifai_grpc.grpc.api.status import status_code_pb2
 
-    metadata = (('authorization', 'Key ' + PAT),)
+channel = ClarifaiChannel.get_grpc_channel()
+stub = service_pb2_grpc.V2Stub(channel)
 
-    userDataObject = resources_pb2.UserAppIDSet(user_id=USER_ID, app_id=APP_ID)
+metadata = (('authorization', 'Key ' + PAT),)
 
-    response = ""
+userDataObject = resources_pb2.UserAppIDSet(user_id=USER_ID, app_id=APP_ID)
 
-    post_workflow_results_response = stub.PostWorkflowResults(
-        service_pb2.PostWorkflowResultsRequest(
-            user_app_id=userDataObject,  
-            workflow_id=WORKFLOW_ID,
-            inputs=[
-                resources_pb2.Input(
-                    data=resources_pb2.Data(
-                        text=resources_pb2.Text(
-                            raw=prompt
-                        )
+post_workflow_results_response = stub.PostWorkflowResults(
+    service_pb2.PostWorkflowResultsRequest(
+        user_app_id=userDataObject,  
+        workflow_id=WORKFLOW_ID,
+        inputs=[
+            resources_pb2.Input(
+                data=resources_pb2.Data(
+                    text=resources_pb2.Text(
+                        url=TEXT_FILE_URL
                     )
                 )
-            ]
-        ),
-        metadata=metadata
-    )
+            )
+        ]
+    ),
+    metadata=metadata
+)
+if post_workflow_results_response.status.code != status_code_pb2.SUCCESS:
+    print(post_workflow_results_response.status)
+    raise Exception("Post workflow results failed, status: " + post_workflow_results_response.status.description)
 
-    if post_workflow_results_response.status.code != status_code_pb2.SUCCESS:
-        print(post_workflow_results_response.status)
+# We'll get one WorkflowResult for each input we used above. Because of one input, we have here one WorkflowResult
+results = post_workflow_results_response.results[0]
 
-        return response
+# Each model we have in the workflow will produce one output.
+for output in results.outputs:
+    model = output.model
 
-    # We'll get one WorkflowResult for each input we used above. Because of one input, we have here one WorkflowResult
-    results = post_workflow_results_response.results[0]
+    print("Predicted concepts for the model `%s`" % model.id)
+    for concept in output.data.concepts:
+        print("	%s %.2f" % (concept.name, concept.value))
 
-    # Each model we have in the workflow will produce one output.
-    for output in results.outputs:
-        model = output.model
-
-        print("Predicted concepts for the model `%s`" % model.id)
-        for concept in output.data.concepts:
-            print("	%s %.2f" % (concept.name, concept.value))
-
-        response += output.data.text.raw + "\n"
-
-    # Uncomment this line to print the full Response JSON
-    # print(results)
-    print(response)
+# Uncomment this line to print the full Response JSON
+#print(results)
